@@ -7,6 +7,18 @@ import {
   BookingImportPayload,
 } from "./types";
 import { generateId } from "./utils";
+import { getAdapter } from "./adapters";
+
+// ---------------------------------------------------------------------------
+// Adapter instance — use *Async exports when migrating pages to Supabase.
+// Sync exports below use localStorage directly for backward compatibility.
+// ---------------------------------------------------------------------------
+
+export const adapter = getAdapter();
+
+// ---------------------------------------------------------------------------
+// localStorage keys (used by sync functions)
+// ---------------------------------------------------------------------------
 
 const KEYS = {
   jobs: "nordic-ops-jobs",
@@ -25,6 +37,8 @@ function get<T>(key: string): T[] {
 function set<T>(key: string, data: T[]): void {
   localStorage.setItem(key, JSON.stringify(data));
 }
+
+// ===== SYNC FUNCTIONS (localStorage — current app uses these) ==============
 
 // --- Jobs ---
 
@@ -51,9 +65,7 @@ export function deleteJob(id: string): void {
   );
 }
 
-export function createCustomerJob(
-  data: Partial<CustomerJob>
-): CustomerJob {
+export function createCustomerJob(data: Partial<CustomerJob>): CustomerJob {
   const job: CustomerJob = {
     id: generateId(),
     customerName: data.customerName || "",
@@ -99,7 +111,7 @@ export function updatePaymentStatus(
   }
 }
 
-// --- Booking Import Adapter ---
+// --- Booking Import ---
 
 export function mapBookingPayloadToCustomerJob(
   payload: BookingImportPayload
@@ -236,4 +248,62 @@ export function importAllData(json: string): void {
   if (data.pricing) set(KEYS.pricing, data.pricing);
   if (data.content) set(KEYS.content, data.content);
   if (data.settings) saveSettings(data.settings);
+}
+
+// ===== ASYNC FUNCTIONS (adapter — use when migrating to Supabase) ==========
+
+export const getJobsAsync = () => adapter.getJobs();
+export const getJobAsync = (id: string) => adapter.getJob(id);
+export const saveJobAsync = (job: CustomerJob) => adapter.saveJob(job);
+export const deleteJobAsync = (id: string) => adapter.deleteJob(id);
+
+export const getQuotesAsync = () => adapter.getQuotes();
+export const saveQuoteAsync = (quote: Quote) => adapter.saveQuote(quote);
+export const deleteQuoteAsync = (id: string) => adapter.deleteQuote(id);
+
+export const getPricingAsync = () => adapter.getPricing();
+export const savePricingItemAsync = (item: PricingItem) => adapter.savePricingItem(item);
+export const deletePricingItemAsync = (id: string) => adapter.deletePricingItem(id);
+
+export const getContentIdeasAsync = () => adapter.getContentIdeas();
+export const saveContentIdeaAsync = (idea: ContentIdea) => adapter.saveContentIdea(idea);
+export const deleteContentIdeaAsync = (id: string) => adapter.deleteContentIdea(id);
+
+export const getSettingsAsync = () => adapter.getSettings();
+export const saveSettingsAsync = (s: AppSettings) => adapter.saveSettings(s);
+
+export const exportAllDataAsync = () => adapter.exportAllData();
+export const importAllDataAsync = (json: string) => adapter.importAllData(json);
+
+export async function createCustomerJobAsync(
+  data: Partial<CustomerJob>
+): Promise<CustomerJob> {
+  const job: CustomerJob = {
+    id: generateId(),
+    customerName: data.customerName || "",
+    phone: data.phone || "",
+    email: data.email || "",
+    vehicleType: data.vehicleType || "",
+    brandModel: data.brandModel || "",
+    problem: data.problem || "",
+    internalNotes: data.internalNotes || "",
+    status: data.status || "Ny",
+    price: data.price || 0,
+    paymentStatus: data.paymentStatus || "Ej betald",
+    source: data.source || "Walk-in",
+    nextStep: data.nextStep || "",
+    createdAt: data.createdAt || new Date().toISOString(),
+    preferredDate: data.preferredDate || "",
+    pickupDelivery: data.pickupDelivery || "",
+    campaignCode: data.campaignCode || "",
+  };
+  await adapter.saveJob(job);
+  return job;
+}
+
+export async function importBookingAsync(
+  payload: BookingImportPayload
+): Promise<CustomerJob> {
+  const jobData = mapBookingPayloadToCustomerJob(payload);
+  return createCustomerJobAsync(jobData);
 }
